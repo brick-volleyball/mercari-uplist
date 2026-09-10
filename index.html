@@ -203,25 +203,38 @@ const scraperSource = `(function(){
     const container = a.closest('li') || a.closest('div') || a;
     const aText = a.textContent || '';
     const text = container.textContent || '';
-    // price: prefer the anchor's own text (tightly scoped to a single item) before the wider container,
-    // since climbing to an ancestor <div> can accidentally merge in text/digits from neighboring items.
+    // price: Mercari renders price as adjacent <span>¥</span><span>45,000</span> with NO
+    // whitespace between them and the following like/comment/view counts, so reading the whole
+    // card's textContent merges those digits together into a huge bogus number. The fix is to
+    // read ONLY the dedicated price element (data-testid="price"), never the wider text.
     let price = null;
-    const priceEl = a.querySelector('mer-price') || container.querySelector('mer-price');
-    if (priceEl) {
-      const pm = (priceEl.textContent || '').match(/[\\d,]+/);
+    const priceScopedEl = a.querySelector('[data-testid="price"]') || container.querySelector('[data-testid="price"]');
+    if (priceScopedEl) {
+      const pm = (priceScopedEl.textContent || '').match(/[\\d,]+/);
       if (pm) price = parseInt(pm[0].replace(/,/g, ''), 10);
+    }
+    if (price === null) {
+      // fallback for markup that doesn't have data-testid="price" (older/alternate layout)
+      const priceEl = a.querySelector('mer-price') || container.querySelector('mer-price');
+      if (priceEl) {
+        const pm = (priceEl.textContent || '').match(/[\\d,]+/);
+        if (pm) price = parseInt(pm[0].replace(/,/g, ''), 10);
+      }
     }
     if (price === null) {
       const pm2 = aText.match(/¥\\s?([\\d,]+)/) || text.match(/¥\\s?([\\d,]+)/);
       if (pm2) price = parseInt(pm2[1].replace(/,/g, ''), 10);
     }
     // sanity guard: a real used-marketplace listing price is realistically under ¥500,000.
-    // A bigger number almost certainly means unrelated digits got merged in, so show "unknown" instead of a fake price.
+    // A bigger number almost certainly means unrelated digits got merged in (fallback path only),
+    // so show "unknown" instead of a fake price rather than risk showing wrong data.
     if (price !== null && (price > 500000 || price <= 0)) { price = null; }
-    // title
+    // title: prefer the dedicated label element (clean, no "のサムネイル" suffix)
     let title = '';
+    const titleEl = a.querySelector('[data-testid="item-label"]') || container.querySelector('[data-testid="item-label"]');
+    if (titleEl) title = titleEl.textContent.trim();
     const img = a.querySelector('img') || container.querySelector('img');
-    if (img && img.alt) title = img.alt.trim();
+    if (!title && img && img.alt) title = img.alt.trim();
     if (!title) {
       const al = a.getAttribute('aria-label') || container.getAttribute('aria-label');
       if (al) title = al.trim();
@@ -230,7 +243,8 @@ const scraperSource = `(function(){
       const nameEl = container.querySelector('[class*="itemName" i], [class*="item-name" i], [class*="title" i]');
       if (nameEl) title = nameEl.textContent.trim();
     }
-    // Mercari's thumbnail alt text is often "商品名のサムネイル" / "商品名のサムネイル画像" - strip that suffix.
+    // Mercari's thumbnail alt text is often "商品名のサムネイル" / "商品名のサムネイル画像" - strip that suffix
+    // as a safety net in case the dedicated label element wasn't found and we fell back to alt text.
     title = title.replace(/の(サムネイル|サムネ)(画像)?\\s*$/, '').trim();
     // status
     let status = '販売中';
