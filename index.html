@@ -201,21 +201,26 @@ const scraperSource = `(function(){
     if (seen.has(id)) return;
     seen.add(id);
     const container = a.closest('li') || a.closest('div') || a;
+    const aText = a.textContent || '';
     const text = container.textContent || '';
-    // price
+    // price: prefer the anchor's own text (tightly scoped to a single item) before the wider container,
+    // since climbing to an ancestor <div> can accidentally merge in text/digits from neighboring items.
     let price = null;
-    const priceEl = container.querySelector('mer-price');
+    const priceEl = a.querySelector('mer-price') || container.querySelector('mer-price');
     if (priceEl) {
       const pm = (priceEl.textContent || '').match(/[\\d,]+/);
       if (pm) price = parseInt(pm[0].replace(/,/g, ''), 10);
     }
     if (price === null) {
-      const pm2 = text.match(/¥\\s?([\\d,]+)/);
+      const pm2 = aText.match(/¥\\s?([\\d,]+)/) || text.match(/¥\\s?([\\d,]+)/);
       if (pm2) price = parseInt(pm2[1].replace(/,/g, ''), 10);
     }
+    // sanity guard: a real used-marketplace listing price is realistically under ¥500,000.
+    // A bigger number almost certainly means unrelated digits got merged in, so show "unknown" instead of a fake price.
+    if (price !== null && (price > 500000 || price <= 0)) { price = null; }
     // title
     let title = '';
-    const img = container.querySelector('img');
+    const img = a.querySelector('img') || container.querySelector('img');
     if (img && img.alt) title = img.alt.trim();
     if (!title) {
       const al = a.getAttribute('aria-label') || container.getAttribute('aria-label');
@@ -225,11 +230,14 @@ const scraperSource = `(function(){
       const nameEl = container.querySelector('[class*="itemName" i], [class*="item-name" i], [class*="title" i]');
       if (nameEl) title = nameEl.textContent.trim();
     }
+    // Mercari's thumbnail alt text is often "商品名のサムネイル" / "商品名のサムネイル画像" - strip that suffix.
+    title = title.replace(/の(サムネイル|サムネ)(画像)?\\s*$/, '').trim();
     // status
     let status = '販売中';
     if (/売り切れ|SOLD OUT|Sold Out/i.test(text)) status = '売り切れ';
     else if (/取引中/.test(text)) status = '取引中';
     const thumbnail = img ? (img.currentSrc || img.src) : '';
+    if (price === null) console.warn('価格を特定できませんでした:', id, title);
     results.push({ id: id, title: title, price: price, status: status,
       url: 'https://jp.mercari.com/item/' + id, thumbnail: thumbnail });
   });
