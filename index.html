@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>メルカリ出品管理ツール</title>
+<style>
+  :root{
+    --bg:#f7f7f8; --card:#ffffff; --border:#e2e2e6; --text:#222; --sub:#666;
+    --accent:#e0405a; --accent-soft:#fdeaee; --ok:#2e8b57; --warn:#b8860b;
+    --row-hover:#fafafa;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",Meiryo,system-ui,sans-serif;
+    font-size:14px; line-height:1.5;
+  }
+  .wrap{max-width:1200px; margin:0 auto; padding:20px 16px 60px;}
+  h1{font-size:20px; margin:0 0 4px;}
+  .sub-lead{color:var(--sub); font-size:13px; margin:0 0 20px;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin-bottom:16px;}
+  details.card summary{cursor:pointer; font-weight:600; font-size:15px; list-style:none;}
+  details.card summary::-webkit-details-marker{display:none;}
+  details.card summary::before{content:"▶ "; font-size:11px; color:var(--sub);}
+  details[open].card summary::before{content:"▼ ";}
+  .card h2{font-size:15px; margin:0 0 10px;}
+  .steps{margin:10px 0 14px; padding-left:20px;}
+  .steps li{margin-bottom:8px;}
+  textarea.script-box{
+    width:100%; min-height:140px; font-family:Menlo,Consolas,monospace; font-size:12px;
+    padding:10px; border:1px solid var(--border); border-radius:6px; background:#fbfbfc; resize:vertical;
+  }
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+    background:var(--accent); color:#fff; border:none; border-radius:6px;
+    padding:8px 14px; font-size:13px; font-weight:600;
+  }
+  .btn:hover{opacity:.9;}
+  .btn.secondary{background:#fff; color:var(--text); border:1px solid var(--border);}
+  .btn.small{padding:5px 10px; font-size:12px;}
+  .row-actions{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px;}
+  .note{font-size:12px; color:var(--sub); margin-top:8px;}
+  .toolbar{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px;}
+  .toolbar input[type=text], .toolbar select{
+    padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:#fff;
+  }
+  .toolbar input[type=text]{min-width:200px; flex:1;}
+  .summary{font-size:13px; color:var(--sub); margin-bottom:10px;}
+  .summary b{color:var(--text);}
+  table{width:100%; border-collapse:collapse; background:#fff;}
+  thead th{
+    text-align:left; font-size:12px; color:var(--sub); font-weight:600;
+    border-bottom:2px solid var(--border); padding:8px 8px; white-space:nowrap; cursor:pointer; user-select:none;
+  }
+  thead th.no-sort{cursor:default;}
+  thead th .arrow{font-size:10px; margin-left:3px; color:var(--accent);}
+  tbody td{padding:8px; border-bottom:1px solid var(--border); vertical-align:middle; font-size:13px;}
+  tbody tr:hover{background:var(--row-hover);}
+  .thumb{width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid var(--border); background:#f0f0f0; display:block;}
+  .thumb.placeholder{display:flex; align-items:center; justify-content:center; color:#bbb; font-size:10px;}
+  .title-cell{max-width:320px;}
+  .title-cell a{color:var(--text); text-decoration:none;}
+  .title-cell a:hover{text-decoration:underline;}
+  .price-cell{font-weight:600; white-space:nowrap;}
+  .badge{display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap;}
+  .badge.selling{background:#e6f4ea; color:var(--ok);}
+  .badge.trading{background:#fff6e0; color:var(--warn);}
+  .badge.sold{background:#f0f0f0; color:#888;}
+  .tag-input, .note-input{
+    width:100%; min-width:90px; padding:5px 6px; border:1px solid var(--border); border-radius:5px; font-size:12px;
+  }
+  .date-cell{white-space:nowrap; color:var(--sub); font-size:12px;}
+  .link-cell a{font-size:12px; color:var(--accent); text-decoration:none;}
+  .empty-state{text-align:center; padding:50px 20px; color:var(--sub);}
+  .empty-state .big{font-size:15px; margin-bottom:6px; color:var(--text);}
+  .file-input-label{
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer; background:#fff; border:1px solid var(--border);
+    border-radius:6px; padding:8px 14px; font-size:13px; font-weight:600;
+  }
+  .file-input-label input{display:none;}
+  .import-mode{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--sub);}
+  .flash{
+    position:fixed; top:16px; right:16px; background:#222; color:#fff; padding:10px 16px; border-radius:8px;
+    font-size:13px; opacity:0; transform:translateY(-8px); transition:all .25s; pointer-events:none; z-index:99;
+  }
+  .flash.show{opacity:1; transform:translateY(0);}
+  @media (max-width:700px){
+    .title-cell{max-width:160px;}
+    table, thead, tbody, tr{display:block;}
+    thead{display:none;}
+    tbody tr{border:1px solid var(--border); border-radius:8px; margin-bottom:10px; padding:8px;}
+    tbody td{border:none; display:flex; justify-content:space-between; gap:10px; padding:4px 2px;}
+    tbody td::before{content:attr(data-label); font-size:11px; color:var(--sub); font-weight:600; flex-shrink:0;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>メルカリ出品管理ツール</h1>
+  <p class="sub-lead">出品中の商品をタイトル・価格・状態で並び替え、タグ付けやキーワード検索ができます。サーバーは使わず、このHTMLファイル単体で完結します。</p>
+
+  <details class="card" id="howto">
+    <summary>① データの取得方法（メルカリのページから一覧を自動抽出）</summary>
+    <div style="margin-top:12px;">
+      <ol class="steps">
+        <li>PCのブラウザ（Chromeなど）でメルカリにログインし、<b>マイページ →「出品した商品」</b>のページを開きます。</li>
+        <li>ページを一番下までスクロールして、出品中の商品がすべて表示された状態にします（読み込み中の場合は少し待ってください）。</li>
+        <li>キーボードの <b>F12</b>（Macは <b>Cmd+Option+I</b>）でデベロッパーツールを開き、上部の<b>「Console」</b>タブを選びます。</li>
+        <li>下のコードを「コピー」ボタンでコピーし、Consoleの入力欄に貼り付けて <b>Enter</b> を押します。</li>
+        <li>抽出件数のアラートが出て、<code>mercari_listings_日付.json</code> というファイルが自動でダウンロードされます。</li>
+        <li>下の「② 一覧・管理」にある「取り込み」ボタンから、そのJSONファイルを読み込みます。</li>
+      </ol>
+      <textarea class="script-box" id="scraperScript" readonly></textarea>
+      <div class="row-actions">
+        <button class="btn secondary small" onclick="copyScript()">📋 コードをコピー</button>
+      </div>
+      <p class="note">
+        ※ メルカリ側のページ構造が変わると抽出がうまくいかない場合があります。件数が0件だったり、タイトル・価格がずれている場合は、
+        Consoleに出た内容（<code>console.table</code>の結果）のスクリーンショットを送ってください。抽出ロジックを調整します。<br>
+        ※ この方法はご自身がログイン中の画面に表示されている情報を読み取るだけで、外部にデータを送信することはありません。
+      </p>
+    </div>
+  </details>
+
+  <div class="card" id="mainTool">
+    <h2>② 一覧・管理</h2>
+
+    <div class="row-actions" style="margin-bottom:14px;">
+      <label class="file-input-label">
+        📥 JSONを取り込む
+        <input type="file" id="fileInput" accept="application/json,.json">
+      </label>
+      <button class="btn secondary" onclick="exportJSON()">💾 JSONで保存</button>
+      <button class="btn secondary" onclick="exportCSV()">📄 CSVでエクスポート</button>
+      <button class="btn secondary" onclick="if(confirm('すべてのデータを削除します。よろしいですか？（先に保存することをおすすめします）')) clearAll();">🗑 全削除</button>
+    </div>
+    <p class="note" style="margin-top:-6px;">
+      前回「JSONで保存」した内容と、新しく取得したJSONを両方取り込むと、タグやメモを保持したまま最新の価格・状態にマージされます。
+      作業を終える前に「JSONで保存」を忘れずに（このツールはブラウザに自動保存しません）。
+    </p>
+
+    <div class="toolbar">
+      <input type="text" id="searchBox" placeholder="🔍 タイトル・タグ・メモで検索" oninput="render()">
+      <select id="statusFilter" onchange="render()">
+        <option value="">状態: すべて</option>
+        <option value="販売中">販売中</option>
+        <option value="取引中">取引中</option>
+        <option value="売り切れ">売り切れ</option>
+      </select>
+      <select id="tagFilter" onchange="render()">
+        <option value="">タグ: すべて</option>
+      </select>
+    </div>
+
+    <div class="summary" id="summary"></div>
+
+    <div id="tableWrap">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th class="no-sort">画像</th>
+            <th data-key="title">タイトル<span class="arrow"></span></th>
+            <th data-key="price">価格<span class="arrow"></span></th>
+            <th data-key="status">状態<span class="arrow"></span></th>
+            <th data-key="tag">タグ<span class="arrow"></span></th>
+            <th class="no-sort">メモ</th>
+            <th data-key="firstSeen">初回取得<span class="arrow"></span></th>
+            <th data-key="lastSeen">最終確認<span class="arrow"></span></th>
+            <th class="no-sort">リンク</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">
+        <div class="big">まだデータがありません</div>
+        <div>上の「① データの取得方法」を開いて、メルカリから出品一覧を取得してください。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="flash" id="flash"></div>
+
+<script>
+/* ---------- state ---------- */
+let items = []; // {id,title,price,status,url,thumbnail,tag,note,firstSeen,lastSeen}
+let sortKey = 'lastSeen';
+let sortDir = 'desc';
+
+/* ---------- scraper script (embedded as text, not executed here) ---------- */
+const scraperSource = `(function(){
+  const results = [];
+  const seen = new Set();
+  const anchors = document.querySelectorAll('a[href*="/item/m"]');
+  anchors.forEach(function(a){
+    const href = a.getAttribute('href') || '';
+    const m = href.match(/\\/item\\/(m\\d+)/);
+    if (!m) return;
+    const id = m[1];
+    if (seen.has(id)) return;
+    seen.add(id);
+    const container = a.closest('li') || a.closest('div') || a;
+    const text = container.textContent || '';
+    // price
+    let price = null;
+    const priceEl = container.querySelector('mer-price');
+    if (priceEl) {
+      const pm = (priceEl.textContent || '').match(/[\\d,]+/);
+      if (pm) price = parseInt(pm[0].replace(/,/g, ''), 10);
+    }
+    if (price === null) {
+      const pm2 = text.match(/¥\\s?([\\d,]+)/);
+      if (pm2) price = parseInt(pm2[1].replace(/,/g, ''), 10);
+    }
+    // title
+    let title = '';
+    const img = container.querySelector('img');
+    if (img && img.alt) title = img.alt.trim();
+    if (!title) {
+      const al = a.getAttribute('aria-label') || container.getAttribute('aria-label');
+      if (al) title = al.trim();
+    }
+    if (!title) {
+      const nameEl = container.querySelector('[class*="itemName" i], [class*="item-name" i], [class*="title" i]');
+      if (nameEl) title = nameEl.textContent.trim();
+    }
+    // status
+    let status = '販売中';
+    if (/売り切れ|SOLD OUT|Sold Out/i.test(text)) status = '売り切れ';
+    else if (/取引中/.test(text)) status = '取引中';
+    const thumbnail = img ? (img.currentSrc || img.src) : '';
+    results.push({ id: id, title: title, price: price, status: status,
+      url: 'https://jp.mercari.com/item/' + id, thumbnail: thumbnail });
+  });
+  console.table(results);
+  const blob = new Blob([JSON.stringify(results, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a2 = document.createElement('a');
+  a2.href = url;
+  a2.download = 'mercari_listings_' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a2);
+  a2.click();
+  document.body.removeChild(a2);
+  URL.revokeObjectURL(url);
+  alert(results.length + ' 件のデータを抽出し、JSONファイルをダウンロードしました。');
+})();`;
+
+document.getElementById('scraperScript').value = scraperSource;
+
+function copyScript(){
+  const ta = document.getElementById('scraperScript');
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(ta.value).then(function(){
+    flash('コピーしました。メルカリのConsoleに貼り付けてください。');
+  }).catch(function(){
+    document.execCommand('copy');
+    flash('コピーしました。メルカリのConsoleに貼り付けてください。');
+  });
+}
+
+function flash(msg){
+  const el = document.getElementById('flash');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(function(){ el.classList.remove('show'); }, 2200);
+}
+
+/* ---------- import / merge ---------- */
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const data = JSON.parse(evt.target.result);
+      if (!Array.isArray(data)) throw new Error('配列形式のJSONではありません');
+      mergeItems(data);
+      flash(data.length + '件のデータを取り込みました');
+    }catch(err){
+      alert('読み込みに失敗しました: ' + err.message);
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+});
+
+function mergeItems(incoming){
+  const now = new Date().toISOString();
+  const byId = {};
+  items.forEach(function(it){ byId[it.id] = it; });
+
+  incoming.forEach(function(raw){
+    if (!raw || !raw.id) return;
+    const existing = byId[raw.id];
+    if (existing){
+      existing.title = raw.title || existing.title;
+      if (typeof raw.price === 'number') existing.price = raw.price;
+      existing.status = raw.status || existing.status;
+      existing.url = raw.url || existing.url;
+      existing.thumbnail = raw.thumbnail || existing.thumbnail;
+      existing.lastSeen = now;
+      // preserve tag/note/firstSeen
+      if (raw.tag !== undefined && existing.tag === undefined) existing.tag = raw.tag;
+      if (raw.note !== undefined && existing.note === undefined) existing.note = raw.note;
+    } else {
+      byId[raw.id] = {
+        id: raw.id,
+        title: raw.title || '',
+        price: typeof raw.price === 'number' ? raw.price : null,
+        status: raw.status || '販売中',
+        url: raw.url || '',
+        thumbnail: raw.thumbnail || '',
+        tag: raw.tag || '',
+        note: raw.note || '',
+        firstSeen: raw.firstSeen || now,
+        lastSeen: raw.lastSeen || now
+      };
+    }
+  });
+
+  items = Object.values(byId);
+  refreshTagFilterOptions();
+  render();
+}
+
+/* ---------- export ---------- */
+function exportJSON(){
+  if (items.length === 0){ alert('保存するデータがありません'); return; }
+  const blob = new Blob([JSON.stringify(items, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'mercari_managed_' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  flash('JSONを保存しました');
+}
+
+function exportCSV(){
+  if (items.length === 0){ alert('出力するデータがありません'); return; }
+  const cols = ['id','title','price','status','tag','note','firstSeen','lastSeen','url'];
+  const header = ['ID','タイトル','価格','状態','タグ','メモ','初回取得','最終確認','URL'];
+  const rows = [header.join(',')];
+  items.forEach(function(it){
+    const row = cols.map(function(c){
+      let v = it[c] === null || it[c] === undefined ? '' : String(it[c]);
+      v = v.replace(/"/g, '""');
+      if (v.search(/[",\n]/) >= 0) v = '"' + v + '"';
+      return v;
+    });
+    rows.push(row.join(','));
+  });
+  const csv = '﻿' + rows.join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'mercari_listings_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  flash('CSVを出力しました');
+}
+
+function clearAll(){
+  items = [];
+  refreshTagFilterOptions();
+  render();
+}
+
+/* ---------- editing ---------- */
+function updateField(id, field, value){
+  const it = items.find(function(x){ return x.id === id; });
+  if (!it) return;
+  it[field] = value;
+  if (field === 'tag') refreshTagFilterOptions();
+}
+
+/* ---------- sorting / filtering / render ---------- */
+document.querySelectorAll('#dataTable thead th[data-key]').forEach(function(th){
+  th.addEventListener('click', function(){
+    const key = th.getAttribute('data-key');
+    if (sortKey === key){
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortKey = key;
+      sortDir = (key === 'title' || key === 'tag') ? 'asc' : 'desc';
+    }
+    render();
+  });
+});
+
+function refreshTagFilterOptions(){
+  const sel = document.getElementById('tagFilter');
+  const current = sel.value;
+  const tags = Array.from(new Set(items.map(function(it){ return (it.tag || '').trim(); }).filter(Boolean))).sort();
+  sel.innerHTML = '<option value="">タグ: すべて</option>' +
+    tags.map(function(t){ return '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>'; }).join('');
+  if (tags.indexOf(current) >= 0) sel.value = current;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function statusBadgeClass(status){
+  if (status === '売り切れ') return 'sold';
+  if (status === '取引中') return 'trading';
+  return 'selling';
+}
+
+function fmtDate(iso){
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const p = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear() + '/' + p(d.getMonth()+1) + '/' + p(d.getDate());
+}
+
+function render(){
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  const statusF = document.getElementById('statusFilter').value;
+  const tagF = document.getElementById('tagFilter').value;
+
+  let list = items.filter(function(it){
+    if (statusF && it.status !== statusF) return false;
+    if (tagF && (it.tag || '') !== tagF) return false;
+    if (q){
+      const hay = ((it.title||'') + ' ' + (it.tag||'') + ' ' + (it.note||'')).toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+
+  list.sort(function(a, b){
+    let av = a[sortKey], bv = b[sortKey];
+    if (sortKey === 'price'){
+      av = av === null || av === undefined ? -Infinity : av;
+      bv = bv === null || bv === undefined ? -Infinity : bv;
+    } else {
+      av = (av || '').toString().toLowerCase();
+      bv = (bv || '').toString().toLowerCase();
+    }
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // sort arrows
+  document.querySelectorAll('#dataTable thead th[data-key]').forEach(function(th){
+    const arrow = th.querySelector('.arrow');
+    if (th.getAttribute('data-key') === sortKey){
+      arrow.textContent = sortDir === 'asc' ? '▲' : '▼';
+    } else {
+      arrow.textContent = '';
+    }
+  });
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+
+  document.getElementById('emptyState').style.display = items.length === 0 ? 'block' : 'none';
+  document.getElementById('tableWrap').style.display = items.length === 0 ? 'none' : 'block';
+  // keep empty-state visible even when tableWrap hidden
+  if (items.length === 0){
+    document.getElementById('emptyState').style.display = 'block';
+  }
+
+  list.forEach(function(it){
+    const tr = document.createElement('tr');
+
+    const tdImg = document.createElement('td');
+    tdImg.setAttribute('data-label','画像');
+    if (it.thumbnail){
+      const img = document.createElement('img');
+      img.className = 'thumb';
+      img.src = it.thumbnail;
+      img.loading = 'lazy';
+      tdImg.appendChild(img);
+    } else {
+      const ph = document.createElement('div');
+      ph.className = 'thumb placeholder';
+      ph.textContent = 'no img';
+      tdImg.appendChild(ph);
+    }
+    tr.appendChild(tdImg);
+
+    const tdTitle = document.createElement('td');
+    tdTitle.className = 'title-cell';
+    tdTitle.setAttribute('data-label','タイトル');
+    const titleLink = document.createElement('a');
+    titleLink.href = it.url || '#';
+    titleLink.target = '_blank';
+    titleLink.rel = 'noopener';
+    titleLink.textContent = it.title || '(タイトル不明)';
+    tdTitle.appendChild(titleLink);
+    tr.appendChild(tdTitle);
+
+    const tdPrice = document.createElement('td');
+    tdPrice.className = 'price-cell';
+    tdPrice.setAttribute('data-label','価格');
+    tdPrice.textContent = (typeof it.price === 'number') ? ('¥' + it.price.toLocaleString()) : '-';
+    tr.appendChild(tdPrice);
+
+    const tdStatus = document.createElement('td');
+    tdStatus.setAttribute('data-label','状態');
+    const badge = document.createElement('span');
+    badge.className = 'badge ' + statusBadgeClass(it.status);
+    badge.textContent = it.status || '-';
+    tdStatus.appendChild(badge);
+    tr.appendChild(tdStatus);
+
+    const tdTag = document.createElement('td');
+    tdTag.setAttribute('data-label','タグ');
+    const tagInput = document.createElement('input');
+    tagInput.className = 'tag-input';
+    tagInput.value = it.tag || '';
+    tagInput.placeholder = '例: ベース';
+    tagInput.addEventListener('change', function(){ updateField(it.id, 'tag', tagInput.value); });
+    tdTag.appendChild(tagInput);
+    tr.appendChild(tdTag);
+
+    const tdNote = document.createElement('td');
+    tdNote.setAttribute('data-label','メモ');
+    const noteInput = document.createElement('input');
+    noteInput.className = 'note-input';
+    noteInput.value = it.note || '';
+    noteInput.placeholder = 'メモ';
+    noteInput.addEventListener('change', function(){ updateField(it.id, 'note', noteInput.value); });
+    tdNote.appendChild(noteInput);
+    tr.appendChild(tdNote);
+
+    const tdFirst = document.createElement('td');
+    tdFirst.className = 'date-cell';
+    tdFirst.setAttribute('data-label','初回取得');
+    tdFirst.textContent = fmtDate(it.firstSeen);
+    tr.appendChild(tdFirst);
+
+    const tdLast = document.createElement('td');
+    tdLast.className = 'date-cell';
+    tdLast.setAttribute('data-label','最終確認');
+    tdLast.textContent = fmtDate(it.lastSeen);
+    tr.appendChild(tdLast);
+
+    const tdLink = document.createElement('td');
+    tdLink.className = 'link-cell';
+    tdLink.setAttribute('data-label','リンク');
+    const openLink = document.createElement('a');
+    openLink.href = it.url || '#';
+    openLink.target = '_blank';
+    openLink.rel = 'noopener';
+    openLink.textContent = '開く ↗';
+    tdLink.appendChild(openLink);
+    tr.appendChild(tdLink);
+
+    tbody.appendChild(tr);
+  });
+
+  const totalCount = items.length;
+  const shownCount = list.length;
+  const sellingSum = list.filter(function(it){ return it.status === '販売中' && typeof it.price === 'number'; })
+                          .reduce(function(s, it){ return s + it.price; }, 0);
+  document.getElementById('summary').innerHTML =
+    '表示中 <b>' + shownCount + '</b> / 全 <b>' + totalCount + '</b> 件　・　表示中の「販売中」合計 <b>¥' + sellingSum.toLocaleString() + '</b>';
+}
+
+render();
+</script>
+</body>
+</html>
