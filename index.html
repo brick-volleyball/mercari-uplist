@@ -85,6 +85,29 @@
     font-size:13px; opacity:0; transform:translateY(-8px); transition:all .25s; pointer-events:none; z-index:99;
   }
   .flash.show{opacity:1; transform:translateY(0);}
+  .col-toggle-row{display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; margin-bottom:12px; font-size:12px; color:var(--sub);}
+  .col-toggle-row .col-toggle-label{font-weight:600; color:var(--text);}
+  .col-toggle-row label{display:inline-flex; align-items:center; gap:4px; cursor:pointer; white-space:nowrap;}
+  .col-toggle-row input{cursor:pointer;}
+  .status-pills{display:flex; flex-wrap:wrap; gap:6px;}
+  .pill{
+    border:1px solid var(--border); background:#fff; color:var(--text); border-radius:20px;
+    padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;
+  }
+  .pill:hover{background:var(--row-hover);}
+  .pill.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .pill-count{font-weight:400; opacity:.85;}
+  .num-cell{white-space:nowrap; text-align:right; color:var(--sub); font-variant-numeric:tabular-nums;}
+  .posted-cell{white-space:nowrap; color:var(--sub); font-size:12px;}
+  #dataTable.hide-thumb .col-thumb,
+  #dataTable.hide-likes .col-likes,
+  #dataTable.hide-comments .col-comments,
+  #dataTable.hide-views .col-views,
+  #dataTable.hide-posted .col-posted,
+  #dataTable.hide-tag .col-tag,
+  #dataTable.hide-note .col-note,
+  #dataTable.hide-first .col-first,
+  #dataTable.hide-last .col-last{display:none;}
   @media (max-width:700px){
     .title-cell{max-width:160px;}
     table, thead, tbody, tr{display:block;}
@@ -98,7 +121,7 @@
 <body>
 <div class="wrap">
   <h1>メルカリ出品管理ツール</h1>
-  <p class="sub-lead">出品中の商品をタイトル・価格・状態で並び替え、タグ付けやキーワード検索ができます。サーバーは使わず、このHTMLファイル単体で完結します。</p>
+  <p class="sub-lead">出品中の商品をタイトル・価格・状態・いいね数・閲覧数・出品時期で並び替え、タグ付けやキーワード検索ができます。表示する項目は自由に選べます。サーバーは使わず、このHTMLファイル単体で完結します。</p>
 
   <details class="card" id="howto">
     <summary>① データの取得方法（メルカリのページから一覧を自動抽出）</summary>
@@ -140,17 +163,31 @@
       作業を終える前に「JSONで保存」を忘れずに（このツールはブラウザに自動保存しません）。
     </p>
 
+    <div class="col-toggle-row" id="colToggleRow">
+      <span class="col-toggle-label">表示項目:</span>
+      <label><input type="checkbox" data-col="thumb" checked> 画像</label>
+      <label><input type="checkbox" data-col="likes" checked> いいね</label>
+      <label><input type="checkbox" data-col="comments" checked> コメント</label>
+      <label><input type="checkbox" data-col="views" checked> 閲覧</label>
+      <label><input type="checkbox" data-col="posted" checked> 出品時期</label>
+      <label><input type="checkbox" data-col="tag" checked> タグ</label>
+      <label><input type="checkbox" data-col="note" checked> メモ</label>
+      <label><input type="checkbox" data-col="first" checked> 初回取得</label>
+      <label><input type="checkbox" data-col="last" checked> 最終確認</label>
+    </div>
+
     <div class="toolbar">
       <input type="text" id="searchBox" placeholder="🔍 タイトル・タグ・メモで検索" oninput="render()">
-      <select id="statusFilter" onchange="render()">
-        <option value="">状態: すべて</option>
-        <option value="販売中">販売中</option>
-        <option value="取引中">取引中</option>
-        <option value="売り切れ">売り切れ</option>
-      </select>
+      <div class="status-pills" id="statusPills">
+        <button type="button" class="pill active" data-status="">すべて<span class="pill-count"></span></button>
+        <button type="button" class="pill" data-status="販売中">販売中<span class="pill-count"></span></button>
+        <button type="button" class="pill" data-status="取引中">取引中<span class="pill-count"></span></button>
+        <button type="button" class="pill" data-status="売り切れ">売り切れ<span class="pill-count"></span></button>
+      </div>
       <select id="tagFilter" onchange="render()">
         <option value="">タグ: すべて</option>
       </select>
+      <button class="btn secondary small" onclick="resetFilters()">🔄 リセット</button>
     </div>
 
     <div class="summary" id="summary"></div>
@@ -159,14 +196,18 @@
       <table id="dataTable">
         <thead>
           <tr>
-            <th class="no-sort">画像</th>
+            <th class="no-sort col-thumb">画像</th>
             <th data-key="title">タイトル<span class="arrow"></span></th>
             <th data-key="price">価格<span class="arrow"></span></th>
             <th data-key="status">状態<span class="arrow"></span></th>
-            <th data-key="tag">タグ<span class="arrow"></span></th>
-            <th class="no-sort">メモ</th>
-            <th data-key="firstSeen">初回取得<span class="arrow"></span></th>
-            <th data-key="lastSeen">最終確認<span class="arrow"></span></th>
+            <th data-key="likes" class="col-likes" title="いいね数">♡<span class="arrow"></span></th>
+            <th data-key="comments" class="col-comments" title="コメント数">💬<span class="arrow"></span></th>
+            <th data-key="views" class="col-views" title="閲覧数">👁<span class="arrow"></span></th>
+            <th data-key="postedDaysAgo" class="col-posted">出品時期<span class="arrow"></span></th>
+            <th data-key="tag" class="col-tag">タグ<span class="arrow"></span></th>
+            <th class="no-sort col-note">メモ</th>
+            <th data-key="firstSeen" class="col-first">初回取得<span class="arrow"></span></th>
+            <th data-key="lastSeen" class="col-last">最終確認<span class="arrow"></span></th>
             <th class="no-sort">リンク</th>
           </tr>
         </thead>
@@ -184,9 +225,10 @@
 
 <script>
 /* ---------- state ---------- */
-let items = []; // {id,title,price,status,url,thumbnail,tag,note,firstSeen,lastSeen}
+let items = []; // {id,title,price,status,likes,comments,views,postedLabel,postedDaysAgo,url,thumbnail,tag,note,firstSeen,lastSeen}
 let sortKey = 'lastSeen';
 let sortDir = 'desc';
+let statusFilter = '';
 
 /* ---------- scraper script (embedded as text, not executed here) ---------- */
 const scraperSource = `(function(){
@@ -252,7 +294,55 @@ const scraperSource = `(function(){
     else if (/取引中/.test(text)) status = '取引中';
     const thumbnail = img ? (img.currentSrc || img.src) : '';
     if (price === null) console.warn('価格を特定できませんでした:', id, title);
+
+    // engagement: いいね/コメント/閲覧 are rendered as icon+number pairs, in that fixed left-to-right order
+    let likes = null, comments = null, views = null;
+    const countSpans = [];
+    a.querySelectorAll('svg').forEach(function(svg){
+      const wrap = svg.closest('div');
+      if (!wrap) return;
+      const span = wrap.querySelector('span');
+      if (span && /^\\d+$/.test((span.textContent || '').trim())) {
+        countSpans.push(parseInt(span.textContent.trim(), 10));
+      }
+    });
+    if (countSpans.length >= 1) likes = countSpans[0];
+    if (countSpans.length >= 2) comments = countSpans[1];
+    if (countSpans.length >= 3) views = countSpans[2];
+
+    // posted time: a standalone text like "2か月前に出品" / "たった今出品".
+    // IMPORTANT: match against each span's OWN textContent individually, not the merged anchor
+    // text - adjacent spans (price/like/comment/view counts) have no whitespace between them,
+    // so reading the whole anchor's textContent merges unrelated digits into the number here too.
+    let postedLabel = '';
+    let postedDaysAgo = null;
+    const postedPattern = /^(たった今|\\d+分前|\\d+時間前|\\d+日前|\\d+週間前|\\d+(?:ヶ|か)月前|\\d+年(?:以上)?前)に?出品$/;
+    let postedMatch = null;
+    const spanNodes = a.querySelectorAll('span');
+    for (let i = 0; i < spanNodes.length; i++) {
+      const t = (spanNodes[i].textContent || '').trim();
+      const mm = t.match(postedPattern);
+      if (mm) { postedMatch = mm; break; }
+    }
+    if (postedMatch) {
+      postedLabel = postedMatch[0];
+      const pm = postedMatch[1];
+      if (pm === 'たった今') {
+        postedDaysAgo = 0;
+      } else {
+        const numMatch = pm.match(/\\d+/);
+        const n = numMatch ? parseInt(numMatch[0], 10) : 0;
+        if (/分前/.test(pm)) postedDaysAgo = n / (60 * 24);
+        else if (/時間前/.test(pm)) postedDaysAgo = n / 24;
+        else if (/週間前/.test(pm)) postedDaysAgo = n * 7;
+        else if (/(ヶ|か)月前/.test(pm)) postedDaysAgo = n * 30;
+        else if (/年/.test(pm)) postedDaysAgo = n * 365;
+        else if (/日前/.test(pm)) postedDaysAgo = n;
+      }
+    }
+
     results.push({ id: id, title: title, price: price, status: status,
+      likes: likes, comments: comments, views: views, postedLabel: postedLabel, postedDaysAgo: postedDaysAgo,
       url: 'https://jp.mercari.com/item/' + id, thumbnail: thumbnail });
   });
   console.table(results);
@@ -322,6 +412,11 @@ function mergeItems(incoming){
       existing.status = raw.status || existing.status;
       existing.url = raw.url || existing.url;
       existing.thumbnail = raw.thumbnail || existing.thumbnail;
+      if (typeof raw.likes === 'number') existing.likes = raw.likes;
+      if (typeof raw.comments === 'number') existing.comments = raw.comments;
+      if (typeof raw.views === 'number') existing.views = raw.views;
+      if (raw.postedLabel) existing.postedLabel = raw.postedLabel;
+      if (typeof raw.postedDaysAgo === 'number') existing.postedDaysAgo = raw.postedDaysAgo;
       existing.lastSeen = now;
       // preserve tag/note/firstSeen
       if (raw.tag !== undefined && existing.tag === undefined) existing.tag = raw.tag;
@@ -332,6 +427,11 @@ function mergeItems(incoming){
         title: raw.title || '',
         price: typeof raw.price === 'number' ? raw.price : null,
         status: raw.status || '販売中',
+        likes: typeof raw.likes === 'number' ? raw.likes : null,
+        comments: typeof raw.comments === 'number' ? raw.comments : null,
+        views: typeof raw.views === 'number' ? raw.views : null,
+        postedLabel: raw.postedLabel || '',
+        postedDaysAgo: typeof raw.postedDaysAgo === 'number' ? raw.postedDaysAgo : null,
         url: raw.url || '',
         thumbnail: raw.thumbnail || '',
         tag: raw.tag || '',
@@ -364,8 +464,8 @@ function exportJSON(){
 
 function exportCSV(){
   if (items.length === 0){ alert('出力するデータがありません'); return; }
-  const cols = ['id','title','price','status','tag','note','firstSeen','lastSeen','url'];
-  const header = ['ID','タイトル','価格','状態','タグ','メモ','初回取得','最終確認','URL'];
+  const cols = ['id','title','price','status','likes','comments','views','postedLabel','tag','note','firstSeen','lastSeen','url'];
+  const header = ['ID','タイトル','価格','状態','いいね','コメント','閲覧','出品時期','タグ','メモ','初回取得','最終確認','URL'];
   const rows = [header.join(',')];
   items.forEach(function(it){
     const row = cols.map(function(c){
@@ -411,11 +511,35 @@ document.querySelectorAll('#dataTable thead th[data-key]').forEach(function(th){
       sortDir = sortDir === 'asc' ? 'desc' : 'asc';
     } else {
       sortKey = key;
-      sortDir = (key === 'title' || key === 'tag') ? 'asc' : 'desc';
+      sortDir = (key === 'title' || key === 'tag' || key === 'postedDaysAgo') ? 'asc' : 'desc';
     }
     render();
   });
 });
+
+document.querySelectorAll('#statusPills .pill').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    statusFilter = btn.getAttribute('data-status');
+    document.querySelectorAll('#statusPills .pill').forEach(function(b){ b.classList.toggle('active', b === btn); });
+    render();
+  });
+});
+
+document.querySelectorAll('#colToggleRow input[type=checkbox]').forEach(function(cb){
+  cb.addEventListener('change', function(){
+    document.getElementById('dataTable').classList.toggle('hide-' + cb.getAttribute('data-col'), !cb.checked);
+  });
+});
+
+function resetFilters(){
+  document.getElementById('searchBox').value = '';
+  document.getElementById('tagFilter').value = '';
+  statusFilter = '';
+  document.querySelectorAll('#statusPills .pill').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-status') === '');
+  });
+  render();
+}
 
 function refreshTagFilterOptions(){
   const sel = document.getElementById('tagFilter');
@@ -446,10 +570,32 @@ function fmtDate(iso){
   return d.getFullYear() + '/' + p(d.getMonth()+1) + '/' + p(d.getDate());
 }
 
+function updatePillCounts(){
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  const tagF = document.getElementById('tagFilter').value;
+  const base = items.filter(function(it){
+    if (tagF && (it.tag || '') !== tagF) return false;
+    if (q){
+      const hay = ((it.title||'') + ' ' + (it.tag||'') + ' ' + (it.note||'')).toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+  const counts = { '': base.length, '販売中': 0, '取引中': 0, '売り切れ': 0 };
+  base.forEach(function(it){ if (counts[it.status] !== undefined) counts[it.status]++; });
+  document.querySelectorAll('#statusPills .pill').forEach(function(btn){
+    const key = btn.getAttribute('data-status');
+    const span = btn.querySelector('.pill-count');
+    span.textContent = ' (' + (counts[key] || 0) + ')';
+  });
+}
+
 function render(){
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
-  const statusF = document.getElementById('statusFilter').value;
+  const statusF = statusFilter;
   const tagF = document.getElementById('tagFilter').value;
+
+  updatePillCounts();
 
   let list = items.filter(function(it){
     if (statusF && it.status !== statusF) return false;
@@ -461,9 +607,10 @@ function render(){
     return true;
   });
 
+  const numericKeys = ['price', 'likes', 'comments', 'views', 'postedDaysAgo'];
   list.sort(function(a, b){
     let av = a[sortKey], bv = b[sortKey];
-    if (sortKey === 'price'){
+    if (numericKeys.indexOf(sortKey) !== -1){
       av = av === null || av === undefined ? -Infinity : av;
       bv = bv === null || bv === undefined ? -Infinity : bv;
     } else {
@@ -499,6 +646,7 @@ function render(){
     const tr = document.createElement('tr');
 
     const tdImg = document.createElement('td');
+    tdImg.className = 'col-thumb';
     tdImg.setAttribute('data-label','画像');
     if (it.thumbnail){
       const img = document.createElement('img');
@@ -539,7 +687,32 @@ function render(){
     tdStatus.appendChild(badge);
     tr.appendChild(tdStatus);
 
+    const tdLikes = document.createElement('td');
+    tdLikes.className = 'num-cell col-likes';
+    tdLikes.setAttribute('data-label','いいね');
+    tdLikes.textContent = (typeof it.likes === 'number') ? ('♡' + it.likes) : '-';
+    tr.appendChild(tdLikes);
+
+    const tdComments = document.createElement('td');
+    tdComments.className = 'num-cell col-comments';
+    tdComments.setAttribute('data-label','コメント');
+    tdComments.textContent = (typeof it.comments === 'number') ? ('💬' + it.comments) : '-';
+    tr.appendChild(tdComments);
+
+    const tdViews = document.createElement('td');
+    tdViews.className = 'num-cell col-views';
+    tdViews.setAttribute('data-label','閲覧');
+    tdViews.textContent = (typeof it.views === 'number') ? ('👁' + it.views) : '-';
+    tr.appendChild(tdViews);
+
+    const tdPosted = document.createElement('td');
+    tdPosted.className = 'posted-cell col-posted';
+    tdPosted.setAttribute('data-label','出品時期');
+    tdPosted.textContent = it.postedLabel || '-';
+    tr.appendChild(tdPosted);
+
     const tdTag = document.createElement('td');
+    tdTag.className = 'col-tag';
     tdTag.setAttribute('data-label','タグ');
     const tagInput = document.createElement('input');
     tagInput.className = 'tag-input';
@@ -550,6 +723,7 @@ function render(){
     tr.appendChild(tdTag);
 
     const tdNote = document.createElement('td');
+    tdNote.className = 'col-note';
     tdNote.setAttribute('data-label','メモ');
     const noteInput = document.createElement('input');
     noteInput.className = 'note-input';
@@ -560,13 +734,13 @@ function render(){
     tr.appendChild(tdNote);
 
     const tdFirst = document.createElement('td');
-    tdFirst.className = 'date-cell';
+    tdFirst.className = 'date-cell col-first';
     tdFirst.setAttribute('data-label','初回取得');
     tdFirst.textContent = fmtDate(it.firstSeen);
     tr.appendChild(tdFirst);
 
     const tdLast = document.createElement('td');
-    tdLast.className = 'date-cell';
+    tdLast.className = 'date-cell col-last';
     tdLast.setAttribute('data-label','最終確認');
     tdLast.textContent = fmtDate(it.lastSeen);
     tr.appendChild(tdLast);
